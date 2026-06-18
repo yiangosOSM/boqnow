@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  clerkId      String        @unique
+  email        String        @unique
+  name         String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  subscription Subscription?
+  projects     Project[]
+  auditLogs    AuditLog[]
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String    @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  plan                 Plan      @default(FREE)
+  status               String    @default("active")
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  overageLog           OverageLog[]
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  status      ProjectStatus @default(PROCESSING)
+  inputFiles  String[]
+  boqData     Json?         // latest BOQ — mirrors current BOQVersion.boqData
+  totalAmount Float?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  versions    BOQVersion[]
+  aiLogs      AIRequestLog[]
+}
+
+// BOQ versioning — every generation creates a new version
+model BOQVersion {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version     Int      @default(1)
+  boqData     Json
+  totalAmount Float
+  method      String   @default("hybrid")   // hybrid | ai_only
+  confidence  String   @default("medium")
+  createdAt   DateTime @default(now())
+
+  @@unique([projectId, version])
+}
+
+// Webhook idempotency — prevent duplicate processing
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  eventId     String   @unique   // Stripe/Clerk event ID
+  source      String             // "stripe" | "clerk"
+  type        String             // event type
+  processedAt DateTime @default(now())
+  status      String   @default("processed")
+}
+
+// Overage billing audit — retry if Stripe fails
+model OverageLog {
+  id               String   @id @default(cuid())
+  subscriptionId   String
+  subscription     Subscription @relation(fields: [subscriptionId], references: [id])
+  projectId        String
+  plan             String
+  overagePrice     Float
+  reported         Boolean  @default(false)
+  reportedAt       DateTime?
+  stripeError      String?
+  createdAt        DateTime @default(now())
+}
+
+// AI request cost tracking
+model AIRequestLog {
+  id             String   @id @default(cuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId         String
+  model          String
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  estimatedCost  Float    @default(0)   // EUR
+  method         String                 // geometry | supplementary | ai_only
+  durationMs     Int      @default(0)
+  createdAt      DateTime @default(now())
+}
+
+// Audit log — who did what and when
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String                       // UPLOAD | GENERATE | EXPORT | DELETE | LOGIN
+  projectId String?
+  metadata  Json?
+  ip        String?
+  createdAt DateTime @default(now())
+}
+
+model Waitlist {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  company   String?
+  createdAt DateTime @default(now())
+}
+
+// ── Price Intelligence Engine ─────────────────────────────────
+
+// Historical quote uploaded by admin or contractor
+// Source of truth for the price database
+model HistoricalQuote {
+  id            String   @id @default(cuid())
+  uploadedBy    String                        // userId (admin) or clerkId
+  scope         QuoteScope @default(SHARED)   // SHARED = visible to all | PERSONAL = only uploader
+  
+  // Project context
+  projectType   String   @default("house")    // house | apartment | commercial | industrial
+  region        String   @default("cyprus")   // cyprus | greece
+  projectDate   DateTime                       // when the quote was issued (NOT upload date)
+  
+  // File
+  filename      String
+  storagePath   String                         // Supabase path
+  fileType      String                         // pdf | xlsx | docx
+  
+  // Extracted line items (populated after AI extraction)
+  lineItems     PriceLineItem[]
+  
+  // Extraction status
+  status        ExtractionStatus @default(PENDING)
+  extractedAt   DateTime?
+  extractionNotes String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Individual line item extracted from a historical quote
+model PriceLineItem {
+  id              String          @id @default(cuid())
+  quoteId         String
+  quote           HistoricalQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  
+  // ΜΕΔΣΚ classification
+  medskoCategory  String          // e.g. "6" (Δάπεδα)
+  medskoCode      String?         // e.g. "ΔΑ.1.2"
+  description     String          // as written in quote
+  unit            String          // m², m³, τεμ., kg, Όλον
+  unitPrice       Float           // price per unit
+  
+  // Normalisation
+  normalisedDesc  String?         // cleaned description for matching
+  materialGroup   String?         // e.g. "aluminium" | "plaster" | "concrete" | "tiles"
+  
+  // Quality
+  confidence      String  @default("medium") // high | medium | low
+  isOutlier       Boolean @default(false)     // flagged by price engine
+  
+  createdAt       DateTime @default(now())
+}
+
+// Computed price reference — updated after each new quote upload
+// This is what the BOQ engine uses at generation time
+model PriceReference {
+  id              String   @id @default(cuid())
+  
+  // Key (unique per material group + region)
+  materialGroup   String   // e.g. "aluminium_premium" | "tiles_60x60" | "concrete_c2530"
+  medskoCode      String?
+  region          String   @default("cyprus")
+  unit            String
+  
+  // Statistics (recomputed on each new quote)
+  avgPrice        Float
+  minPrice        Float
+  maxPrice        Float
+  medianPrice     Float
+  weightedAvg     Float    // time-weighted — recent quotes count more
+  sampleCount     Int      // how many data points
+  lastQuoteDate   DateTime // date of most recent quote in dataset
+  
+  // Confidence
+  confidence      String   @default("medium") // high (10+ samples) | medium (3-9) | low (1-2)
+  
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
+
+  @@unique([materialGroup, region])
+}
+
+enum QuoteScope {
+  SHARED    // visible to price engine for all users
+  PERSONAL  // only used for the uploading contractor's BOQs
+}
+
+enum ExtractionStatus {
+  PENDING
+  PROCESSING
+  COMPLETE
+  FAILED
+}
+
+enum Plan {
+  FREE
+  STARTER
+  PRO
+  AGENCY
+}
+
+enum ProjectStatus {
+  PROCESSING
+  COMPLETE
+  ERROR
+  CANCELLED
+}
