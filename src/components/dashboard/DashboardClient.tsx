@@ -2,8 +2,9 @@
 // src/components/dashboard/DashboardClient.tsx
 import { useState, useRef } from 'react'
 import { UserButton } from '@clerk/nextjs'
+import Link from 'next/link'
 import type { BOQResult } from '@/lib/boq-generator'
-import { Upload, FileText, Download, ChevronDown, ChevronUp, Zap, Clock, CheckCircle } from 'lucide-react'
+import { Upload, FileText, Download, ChevronDown, ChevronUp, Zap, Clock, CheckCircle, ExternalLink } from 'lucide-react'
 import UsageBanner from './UsageBanner'
 
 
@@ -250,7 +251,11 @@ export default function DashboardClient({ user, projectsThisMonth }: DashboardCl
           <div style={{ background: '#fff', border: '1px solid #E0E0E0', borderRadius: 8, padding: 32 }}>
             <h3 style={{ fontFamily: 'Georgia, serif', fontSize: 18, marginBottom: 20, color: '#0A0A0A' }}>Ιστορικό Έργων</h3>
             {user.projects.map(project => (
-              <div key={project.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #F0F0F0' }}>
+              <Link
+                key={project.id}
+                href={`/dashboard/project/${project.id}`}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #F0F0F0', textDecoration: 'none', color: 'inherit' }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   {project.status === 'complete' ? <CheckCircle size={16} color="#1A7A4A" /> : <Clock size={16} color="#9A9A9A" />}
                   <div>
@@ -258,12 +263,15 @@ export default function DashboardClient({ user, projectsThisMonth }: DashboardCl
                     <p style={{ fontSize: 12, color: '#9A9A9A' }}>{new Date(project.createdAt).toLocaleDateString('el-GR')}</p>
                   </div>
                 </div>
-                {project.totalAmount && (
-                  <span style={{ fontFamily: 'Georgia, serif', fontSize: 15, color: '#2A2A2A' }}>
-                    €{project.totalAmount.toLocaleString('el-GR', { minimumFractionDigits: 2 })}
-                  </span>
-                )}
-              </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {project.totalAmount && (
+                    <span style={{ fontFamily: 'Georgia, serif', fontSize: 15, color: '#2A2A2A' }}>
+                      €{project.totalAmount.toLocaleString('el-GR', { minimumFractionDigits: 2 })}
+                    </span>
+                  )}
+                  <ExternalLink size={14} color="#9A9A9A" />
+                </div>
+              </Link>
             ))}
           </div>
         )}
