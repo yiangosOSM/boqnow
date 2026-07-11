@@ -1,0 +1,33 @@
+# Render Blueprint — BOQNOW background worker (BullMQ)
+# Deploy: Render Dashboard → New → Blueprint → connect this repo
+# The Next.js app runs on Vercel; only the worker runs here.
+
+services:
+  - type: worker
+    name: boqnow-worker
+    runtime: node
+    region: frankfurt
+    plan: starter
+    buildCommand: npm ci && npx prisma generate
+    startCommand: npm run worker
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: UPSTASH_REDIS_URL
+        sync: false
+      - key: UPSTASH_REDIS_TOKEN
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
