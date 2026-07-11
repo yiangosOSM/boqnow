@@ -4,12 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "dev:mock": "bash scripts/dev-mock.sh",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
+    "db:seed": "prisma db seed",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
     "type-check": "tsc --noEmit --skipLibCheck",
     "test": "node tests/measur-tests.js",
     "validate": "npm run type-check && npm run test",
@@ -29,6 +33,7 @@
     "cloudconvert": "^3.0.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.383.0",
+    "mammoth": "^1.7.2",
     "next": "14.2.29",
     "pdf-parse": "^1.1.1",
     "puppeteer-core": "^22.0.0",
@@ -39,17 +44,21 @@
     "svix": "^1.21.0",
     "tailwind-merge": "^2.3.0",
     "xlsx": "^0.18.5",
-    "zod": "^3.23.0",
-    "mammoth": "^1.7.2"
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",
+    "playwright": "^1.61.1",
     "postcss": "^8",
     "prisma": "^5.14.0",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.22.4",
     "typescript": "^5.9.3"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
   }
 }
