@@ -7,29 +7,18 @@ import { chromium } from 'playwright'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { getProvisionCredentials, loadEnvFiles } from './lib/load-env-file.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
 const ENV_PATH = join(ROOT, '.env.local')
 const SCREENSHOTS = join(ROOT, 'deploy', 'screenshots')
 
-const EMAIL = 'boqnowdev@gmail.com'
-const PASSWORD = 'Boqdev123!!'
-const RESEND_PASSWORD = 'Boqdev123!!!'
-
-function parseServicesMd() {
-  return { email: EMAIL, password: PASSWORD, resendPassword: RESEND_PASSWORD }
-}
+const { email: EMAIL, password: PASSWORD, resendPassword: RESEND_PASSWORD, dbPassword: PROVISION_DB_PASSWORD } =
+  getProvisionCredentials()
 
 function loadEnv() {
-  const env = {}
-  if (existsSync(ENV_PATH)) {
-    for (const line of readFileSync(ENV_PATH, 'utf8').split('\n')) {
-      const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/)
-      if (m) env[m[1]] = m[2]
-    }
-  }
-  return env
+  return loadEnvFiles(ROOT)
 }
 
 function saveEnv(updates) {
@@ -72,7 +61,10 @@ async function loginEmailPassword(page, email, password, opts = {}) {
 async function provisionSupabase(browser) {
   const ctx = await browser.newContext()
   const page = await ctx.newPage()
-  const dbPassword = 'BoqnowDb2026!Secure'
+  const dbPassword = PROVISION_DB_PASSWORD
+  if (!dbPassword) {
+    throw new Error('Missing PROVISION_DB_PASSWORD in .env.local (required for new Supabase projects).')
+  }
 
   console.log('=== SUPABASE ===')
   await page.goto('https://supabase.com/dashboard/sign-in', { waitUntil: 'domcontentloaded', timeout: 90000 })

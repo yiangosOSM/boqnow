@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: boqnow
-      POSTGRES_PASSWORD: boqnow
+      POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD:-boqnow}
       POSTGRES_DB: boqnow
     ports:
       - '5432:5432'

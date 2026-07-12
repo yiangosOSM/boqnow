@@ -1,9 +1,9 @@
 import { chromium } from 'playwright'
 import { mkdirSync } from 'fs'
 import { join } from 'path'
+import { getProvisionCredentials } from './lib/load-env-file.mjs'
 
-const EMAIL = 'boqnowdev@gmail.com'
-const PASSWORD = 'Boqdev123!!'
+const { email: EMAIL, password: PASSWORD } = getProvisionCredentials()
 const dir = join(process.cwd(), 'deploy/screenshots')
 mkdirSync(dir, { recursive: true })
 
