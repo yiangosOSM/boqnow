@@ -208,6 +208,62 @@ export async function getLivePriceMap(
   return priceMap
 }
 
+// Maps quote-extractor materialGroup slugs → ΜΕΔΣΚ codes used by the rules engine
+export const MATERIAL_GROUP_TO_MEDSKO_CODE: Record<string, string> = {
+  excavation: 'ΧΩ.1.1',
+  concrete_c1620: 'ΣΚ.1.1',
+  concrete_c2025: 'ΣΚ.1.2',
+  concrete_c2530: 'ΣΚ.1.3',
+  steel_s500: 'ΣΚ.2.1',
+  masonry_9cm: 'ΤΟ.1.1',
+  masonry_12cm: 'ΤΟ.1.2',
+  masonry_25cm: 'ΤΟ.1.3',
+  gypsum_board: 'ΤΟ.2.1',
+  plaster_exterior: 'ΕΠ.1.1',
+  plaster_interior: 'ΕΠ.1.2',
+  waterproofing_roof: 'ΜΟ.1.3',
+  xps_5cm: 'ΜΟ.1.1',
+  xps_8cm: 'ΜΟ.1.2',
+  screed_5cm: 'ΔΑ.2.1',
+  tiles_30x30: 'ΔΑ.1.1',
+  tiles_30x60: 'ΔΑ.1.2',
+  tiles_60x60: 'ΔΑ.1.3',
+  tiles_60x60plus: 'ΔΑ.1.3',
+  marble: 'ΔΑ.1.4',
+  aluminium_standard: 'ΚΟ.1.1',
+  aluminium_premium: 'ΚΟ.1.3',
+  door_interior: 'ΚΟ.2.1',
+  door_entrance: 'ΚΟ.2.2',
+  door_wc: 'ΚΟ.2.3',
+  plumbing_ppr: 'ΥΔ.1.1',
+  plumbing_pvc: 'ΥΔ.1.2',
+  wc_suite: 'ΥΔ.2.1',
+  washbasin: 'ΥΔ.2.2',
+  shower: 'ΥΔ.2.3',
+  bathtub: 'ΥΔ.2.4',
+  water_heater: 'ΥΔ.3.1',
+  electrical_circuit: 'ΗΛ.1.1',
+  electrical_panel: 'ΗΛ.1.4',
+  paint_interior: 'ΧΡ.1.1',
+  paint_exterior: 'ΧΡ.1.2',
+  scaffolding: 'ΠΡ.1.3',
+  site_setup: 'ΠΡ.1.1',
+}
+
+// Build ΜΕΔΣΚ-code overrides for the deterministic rules engine
+export function buildCodePriceOverrides(
+  priceMap: Record<string, PricePoint>
+): Record<string, number> {
+  const overrides: Record<string, number> = {}
+
+  for (const [group, point] of Object.entries(priceMap)) {
+    const code = point.medskoCode ?? MATERIAL_GROUP_TO_MEDSKO_CODE[group]
+    if (code) overrides[code] = point.weightedAvg
+  }
+
+  return overrides
+}
+
 // ── Format price map for injection into Step 5 prompt ─────────
 export function formatPriceMapForPrompt(
   priceMap: Record<string, PricePoint>,

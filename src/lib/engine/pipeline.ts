@@ -14,6 +14,7 @@ import {
 } from './prompts/system-prompts'
 import { getRatesByCategory } from './cost-database'
 import type { Region } from './cost-database'
+import { getLivePriceMap, formatPriceMapForPrompt } from './price-engine'
 
 const client = new Anthropic()
 
@@ -206,9 +207,13 @@ export async function runStep5FinalAssembly(
   answers: ClarificationAnswer[],
   projectName: string,
   region: Region = 'cyprus',
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  clerkUserId?: string
 ): Promise<any> {
   onProgress?.({ step: 5, status: 'running', message: 'Δημιουργία τελικού BOQ...', pct: 80 })
+
+  const priceMap = await getLivePriceMap(region, clerkUserId)
+  const livePricePrompt = formatPriceMapForPrompt(priceMap, {})
 
   // Build cost database context
   const costContext = ['ΣΚ', 'ΤΟ', 'ΕΠ', 'ΜΟ', 'ΔΑ', 'ΚΟ', 'ΥΔ', 'ΗΛ', 'ΧΡ', 'ΕΞ', 'ΠΡ']
@@ -234,6 +239,7 @@ ${answersText}
 
 ΒΑΣΗ ΔΕΔΟΜΕΝΩΝ ΚΟΣΤΟΥΣ (${region.toUpperCase()} 2024):
 ${costContext}
+${livePricePrompt}
 
 Δημιούργησε το τελικό, επαληθευμένο ΜΕΔΣΚ BOQ.`
 
@@ -257,12 +263,13 @@ export async function runFullPipeline(
   files: PipelineFile[],
   projectName: string,
   region: Region = 'cyprus',
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  clerkUserId?: string
 ): Promise<any> {
   const classification = await runStep1Classification(files, onProgress)
   const extraction     = await runStep2Extraction(files, classification, projectName, onProgress)
   const review         = await runStep3Review(extraction, classification, onProgress)
-  const boq            = await runStep5FinalAssembly(files, extraction, review, [], projectName, region, onProgress)
+  const boq            = await runStep5FinalAssembly(files, extraction, review, [], projectName, region, onProgress, clerkUserId)
   return { boq, classification, extraction, review, questions: [] }
 }
 
@@ -289,7 +296,8 @@ export async function runPipelinePhaseB(
   answers: ClarificationAnswer[],
   projectName: string,
   region: Region = 'cyprus',
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  clerkUserId?: string
 ): Promise<any> {
-  return runStep5FinalAssembly(files, phaseA.extraction, phaseA.review, answers, projectName, region, onProgress)
+  return runStep5FinalAssembly(files, phaseA.extraction, phaseA.review, answers, projectName, region, onProgress, clerkUserId)
 }

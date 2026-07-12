@@ -11,6 +11,7 @@ import { checkRequestCost, estimatePDFPages, truncateToTokenBudget, COST_LIMITS,
 import { securityCheck, virusTotalHashLookup } from '@/lib/engine/file-security'
 import { parseFile } from '@/lib/engine/file-parser'
 import { generateBOQ } from '@/lib/boq-generator'
+import { getLivePriceMap, formatPriceMapForPrompt, buildCodePriceOverrides } from '@/lib/engine/price-engine'
 import { logger } from '@/lib/logger'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -154,9 +155,17 @@ export async function POST(req: NextRequest) {
 
     messageContent.push({ type: 'text', text: `Αρχεία: ${filesSummary.join(', ')}\nΈργο: "${projectName}"\nΔημιούργησε πλήρες ΜΕΔΣΚ-compliant BOQ.` })
 
+    // ── Live price intelligence ───────────────────────────────
+    const priceMap = await getLivePriceMap('cyprus', userId)
+    const livePricePrompt = formatPriceMapForPrompt(priceMap, {})
+    const priceOverrides = buildCodePriceOverrides(priceMap)
+
     // ── Generate BOQ ──────────────────────────────────────────
     const boqResult = await withTimeout(
-      () => withRetry(() => generateBOQ(messageContent, projectName), { maxAttempts: 2, initialDelay: 2000 }),
+      () => withRetry(
+        () => generateBOQ(messageContent, projectName, 'cyprus', { livePricePrompt, priceOverrides }),
+        { maxAttempts: 2, initialDelay: 2000 }
+      ),
       120_000, 'Η ανάλυση άργησε. Δοκίμασε με λιγότερα αρχεία.'
     )
 
@@ -224,12 +233,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: msg, code }, { status: (error as any)?.status || 500 })
   }
 }
-
-// NOTE FOR DEVELOPER:
-// After messageContent is assembled, inject live price map into the Step 5 prompt:
-//
-// import { getLivePriceMap, formatPriceMapForPrompt } from '@/lib/engine/price-engine'
-// const priceMap = await getLivePriceMap('cyprus', userId)
-// const livePrices = formatPriceMapForPrompt(priceMap, {})
-// Then append livePrices to the final message before calling generateBOQ()
-// The boq-generator.ts Step 5 prompt injection point is already set up.

@@ -6,6 +6,11 @@ import { safeParseJSON } from './errors'
 
 const client = new Anthropic()
 
+export interface BOQGenerationOptions {
+  livePricePrompt?: string
+  priceOverrides?: Record<string, number>
+}
+
 export interface BOQItem {
   id: string; category: string; description: string; unit: string
   quantity: number; unitPrice: number; total: number
@@ -32,8 +37,17 @@ const AI_ONLY_PROMPT = `Είσαι QS Κύπρου. ΜΕΔΣΚ BOQ. EUR 2024. Α
 export async function generateBOQ(
   messageContent: Anthropic.MessageParam['content'],
   projectName: string,
-  region: Region = 'cyprus'
+  region: Region = 'cyprus',
+  options: BOQGenerationOptions = {}
 ): Promise<BOQResult> {
+  const { livePricePrompt = '', priceOverrides } = options
+  const supplementarySystem = livePricePrompt
+    ? `${SUPPLEMENTARY_PROMPT}\n${livePricePrompt}`
+    : SUPPLEMENTARY_PROMPT
+  const aiOnlySystem = livePricePrompt
+    ? `${AI_ONLY_PROMPT}\n${livePricePrompt}`
+    : AI_ONLY_PROMPT
+
   try {
     const geoResp = await client.messages.create({
       model: 'claude-sonnet-4-6', max_tokens: 4096, system: GEOMETRY_PROMPT,  // Sonnet: structured extraction
@@ -43,7 +57,7 @@ export async function generateBOQ(
     const geometry = safeParseJSON<BuildingGeometry>(geoText)
 
     if (geometry && Array.isArray(geometry.rooms) && geometry.rooms.length > 0) {
-      const engineResult = runQuantityEngine(geometry, region)
+      const engineResult = runQuantityEngine(geometry, region, priceOverrides)
       const existingTitles = engineResult.sections.map(s => s.title).join(', ')
 
       const textContent: Anthropic.TextBlockParam = {
@@ -55,7 +69,7 @@ export async function generateBOQ(
         : [...(messageContent as any[]), textContent]
 
       const suppResp = await client.messages.create({
-        model: 'claude-sonnet-4-6', max_tokens: 4096, system: SUPPLEMENTARY_PROMPT,  // Sonnet: structured JSON
+        model: 'claude-sonnet-4-6', max_tokens: 4096, system: supplementarySystem,  // Sonnet: structured JSON
         messages: [{ role: 'user', content: suppContent }],
       })
       const suppText = suppResp.content[0].type === 'text' ? suppResp.content[0].text : ''
@@ -91,7 +105,7 @@ export async function generateBOQ(
 
   // Fallback AI-only
   const resp = await client.messages.create({
-    model: 'claude-opus-4-5', max_tokens: 8192, system: AI_ONLY_PROMPT,  // Opus: complex full BOQ fallback
+    model: 'claude-opus-4-5', max_tokens: 8192, system: aiOnlySystem,  // Opus: complex full BOQ fallback
     messages: [{ role: 'user', content: messageContent }],
   })
   const text = resp.content[0].type === 'text' ? resp.content[0].text : ''

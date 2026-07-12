@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     // Run Phase B (Step 5)
     const start = Date.now()
-    const boqResult = await runPipelinePhaseB(files, phaseA, answers || [], project.name)
+    const boqResult = await runPipelinePhaseB(files, phaseA, answers || [], project.name, 'cyprus', undefined, userId)
     const durationMs = Date.now() - start
 
     // Get next version

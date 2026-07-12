@@ -64,18 +64,24 @@ export interface EngineResult {
   warnings: string[]
 }
 
+type RateLookup = (code: string, fallback: number) => number
+
+function makeRateLookup(region: Region, overrides?: Record<string, number>): RateLookup {
+  return (code, fallback) => overrides?.[code] ?? getRateByCode(code, region) ?? fallback
+}
+
 // ── Core calculation rules ────────────────────────────────────
 
-function calcTiles(room: RoomGeometry, region: Region, waste = 0.10): QuantityLineItem {
+function calcTiles(room: RoomGeometry, rate: RateLookup, waste = 0.10): QuantityLineItem {
   const qty = room.area * (1 + waste)
-  const rate = getRateByCode('ΔΑ.1.2', region) ?? 45
+  const unitPrice = rate('ΔΑ.1.2', 45)
   return {
     code: 'ΔΑ.1.2',
     description: `Πλακάκι δαπέδου — ${room.name}`,
     unit: 'm²',
     quantity: parseFloat(qty.toFixed(2)),
-    unitPrice: rate,
-    total: parseFloat((qty * rate).toFixed(2)),
+    unitPrice,
+    total: parseFloat((qty * unitPrice).toFixed(2)),
     medskoCode: 'ΔΑ.1.2',
     calculationNote: `${room.area}m² × 1.10 (waste 10%)`,
     confidence: 'calculated',
@@ -99,71 +105,71 @@ function calcSkirting(room: RoomGeometry, region: Region): QuantityLineItem {
   }
 }
 
-function calcWallPaint(room: RoomGeometry, region: Region): QuantityLineItem {
+function calcWallPaint(room: RoomGeometry, rate: RateLookup): QuantityLineItem {
   const grossWallArea = room.perimeter * room.height
   const doorArea = room.doors.reduce((s, d) => s + d.width * d.height * d.count, 0)
   const windowArea = room.windows.reduce((s, w) => s + w.width * w.height * w.count, 0)
   const netArea = Math.max(0, grossWallArea - doorArea - windowArea)
-  const rate = getRateByCode('ΧΡ.1.1', region) ?? 8
+  const unitPrice = rate('ΧΡ.1.1', 8)
   return {
     code: 'ΧΡ.1.1',
     description: `Χρωματισμός τοίχων — ${room.name}`,
     unit: 'm²',
     quantity: parseFloat(netArea.toFixed(2)),
-    unitPrice: rate,
-    total: parseFloat((netArea * rate).toFixed(2)),
+    unitPrice,
+    total: parseFloat((netArea * unitPrice).toFixed(2)),
     medskoCode: 'ΧΡ.1.1',
     calculationNote: `(${room.perimeter}×${room.height}) − πόρτες ${doorArea.toFixed(1)}m² − παράθυρα ${windowArea.toFixed(1)}m²`,
     confidence: 'calculated',
   }
 }
 
-function calcCeilingPaint(room: RoomGeometry, region: Region): QuantityLineItem {
-  const rate = getRateByCode('ΧΡ.1.1', region) ?? 8
+function calcCeilingPaint(room: RoomGeometry, rate: RateLookup): QuantityLineItem {
+  const unitPrice = rate('ΧΡ.1.1', 8)
   return {
     code: 'ΧΡ.1.1',
     description: `Χρωματισμός οροφής — ${room.name}`,
     unit: 'm²',
     quantity: parseFloat(room.area.toFixed(2)),
-    unitPrice: rate,
-    total: parseFloat((room.area * rate).toFixed(2)),
+    unitPrice,
+    total: parseFloat((room.area * unitPrice).toFixed(2)),
     medskoCode: 'ΧΡ.1.1',
     calculationNote: `Εμβαδόν δωματίου = ${room.area}m²`,
     confidence: 'calculated',
   }
 }
 
-function calcPlaster(room: RoomGeometry, region: Region): QuantityLineItem {
+function calcPlaster(room: RoomGeometry, rate: RateLookup): QuantityLineItem {
   const grossWallArea = room.perimeter * room.height
   const openings = room.doors.reduce((s, d) => s + d.width * d.height * d.count, 0)
     + room.windows.reduce((s, w) => s + w.width * w.height * w.count, 0)
   const netArea = Math.max(0, grossWallArea - openings) + room.area // walls + ceiling
-  const rate = getRateByCode('ΕΠ.1.2', region) ?? 18
+  const unitPrice = rate('ΕΠ.1.2', 18)
   return {
     code: 'ΕΠ.1.2',
     description: `Επίχρισμα εσωτερικό — ${room.name}`,
     unit: 'm²',
     quantity: parseFloat(netArea.toFixed(2)),
-    unitPrice: rate,
-    total: parseFloat((netArea * rate).toFixed(2)),
+    unitPrice,
+    total: parseFloat((netArea * unitPrice).toFixed(2)),
     medskoCode: 'ΕΠ.1.2',
     calculationNote: `τοίχοι ${(grossWallArea - openings).toFixed(1)}m² + οροφή ${room.area}m²`,
     confidence: 'calculated',
   }
 }
 
-function calcDoors(room: RoomGeometry, region: Region): QuantityLineItem[] {
+function calcDoors(room: RoomGeometry, rate: RateLookup): QuantityLineItem[] {
   return room.doors.map(door => {
     const codeMap = { internal: 'ΚΟ.2.1', entrance: 'ΚΟ.2.2', wc: 'ΚΟ.2.3' }
     const code = codeMap[door.type]
-    const rate = getRateByCode(code, region) ?? 280
+    const unitPrice = rate(code, 280)
     return {
       code,
       description: `Πόρτα ${door.type === 'entrance' ? 'εισόδου' : door.type === 'wc' ? 'WC' : 'εσωτερική'} — ${room.name}`,
       unit: 'τεμ',
       quantity: door.count,
-      unitPrice: rate,
-      total: parseFloat((door.count * rate).toFixed(2)),
+      unitPrice,
+      total: parseFloat((door.count * unitPrice).toFixed(2)),
       medskoCode: code,
       calculationNote: `${door.count} τεμ × ${door.width}×${door.height}m`,
       confidence: 'calculated' as const,
@@ -171,18 +177,18 @@ function calcDoors(room: RoomGeometry, region: Region): QuantityLineItem[] {
   })
 }
 
-function calcWindows(room: RoomGeometry, region: Region): QuantityLineItem[] {
+function calcWindows(room: RoomGeometry, rate: RateLookup): QuantityLineItem[] {
   return room.windows.map(win => {
     const area = win.width * win.height * win.count
-    const rate = getRateByCode('ΚΟ.1.4', region) ?? 320
+    const unitPrice = rate('ΚΟ.1.4', 320)
     const type = win.type === 'sliding' ? 'συρόμενο' : 'ανοιγόμενο'
     return {
       code: 'ΚΟ.1.4',
       description: `Κούφωμα αλουμινίου ${type} — ${room.name}`,
       unit: 'm²',
       quantity: parseFloat(area.toFixed(2)),
-      unitPrice: rate,
-      total: parseFloat((area * rate).toFixed(2)),
+      unitPrice,
+      total: parseFloat((area * unitPrice).toFixed(2)),
       medskoCode: 'ΚΟ.1.4',
       calculationNote: `${win.count} τεμ × ${win.width}×${win.height}m = ${area.toFixed(2)}m²`,
       confidence: 'calculated' as const,
@@ -193,18 +199,19 @@ function calcWindows(room: RoomGeometry, region: Region): QuantityLineItem[] {
 // ── Main engine entry point ───────────────────────────────────
 export function runQuantityEngine(
   geometry: BuildingGeometry,
-  region: Region = 'cyprus'
+  region: Region = 'cyprus',
+  priceOverrides?: Record<string, number>
 ): EngineResult {
   const warnings: string[] = []
   const sections: EngineResult['sections'] = []
+  const rate = makeRateLookup(region, priceOverrides)
 
   // ── Δάπεδα ───────────────────────────────────────────────
   const floorItems: QuantityLineItem[] = []
   for (const room of geometry.rooms) {
-    floorItems.push(calcTiles(room, region))
+    floorItems.push(calcTiles(room, rate))
     floorItems.push(calcSkirting(room, region))
-    // Screed under tiles
-    const screedRate = getRateByCode('ΔΑ.2.1', region) ?? 18
+    const screedRate = rate('ΔΑ.2.1', 18)
     floorItems.push({
       code: 'ΔΑ.2.1',
       description: `Τσιμεντοκονία ισοπέδωσης — ${room.name}`,
@@ -223,8 +230,8 @@ export function runQuantityEngine(
   // ── Κουφώματα ─────────────────────────────────────────────
   const joistItems: QuantityLineItem[] = []
   for (const room of geometry.rooms) {
-    joistItems.push(...calcDoors(room, region))
-    joistItems.push(...calcWindows(room, region))
+    joistItems.push(...calcDoors(room, rate))
+    joistItems.push(...calcWindows(room, rate))
   }
   if (joistItems.length > 0) {
     const sub = joistItems.reduce((s, i) => s + i.total, 0)
@@ -232,26 +239,26 @@ export function runQuantityEngine(
   }
 
   // ── Επιχρίσματα ───────────────────────────────────────────
-  const plasterItems: QuantityLineItem[] = geometry.rooms.map(r => calcPlaster(r, region))
+  const plasterItems: QuantityLineItem[] = geometry.rooms.map(r => calcPlaster(r, rate))
   const plasterSub = plasterItems.reduce((s, i) => s + i.total, 0)
   sections.push({ title: 'Επιχρίσματα', items: plasterItems, subtotal: parseFloat(plasterSub.toFixed(2)) })
 
   // ── Χρωματισμοί ───────────────────────────────────────────
   const paintItems: QuantityLineItem[] = []
   for (const room of geometry.rooms) {
-    paintItems.push(calcWallPaint(room, region))
-    paintItems.push(calcCeilingPaint(room, region))
+    paintItems.push(calcWallPaint(room, rate))
+    paintItems.push(calcCeilingPaint(room, rate))
   }
   const paintSub = paintItems.reduce((s, i) => s + i.total, 0)
   sections.push({ title: 'Χρωματισμοί', items: paintItems, subtotal: parseFloat(paintSub.toFixed(2)) })
 
   // ── Εξωτερικές εργασίες ───────────────────────────────────
   if (geometry.hasPatio && geometry.patioArea) {
-    const rate = getRateByCode('ΕΞ.1.1', region) ?? 42
+    const unitPrice = rate('ΕΞ.1.1', 42)
     const patioItem: QuantityLineItem = {
       code: 'ΕΞ.1.1', description: 'Πλακόστρωση αυλής/βεράντας', unit: 'm²',
-      quantity: geometry.patioArea, unitPrice: rate,
-      total: parseFloat((geometry.patioArea * rate).toFixed(2)),
+      quantity: geometry.patioArea, unitPrice,
+      total: parseFloat((geometry.patioArea * unitPrice).toFixed(2)),
       medskoCode: 'ΕΞ.1.1',
       calculationNote: `Εμβαδόν αυλής = ${geometry.patioArea}m²`,
       confidence: 'calculated',
@@ -260,11 +267,11 @@ export function runQuantityEngine(
   }
 
   if (geometry.hasPool && geometry.poolArea) {
-    const rate = getRateByCode('ΕΞ.1.3', region) ?? 1200
+    const unitPrice = rate('ΕΞ.1.3', 1200)
     const poolItem: QuantityLineItem = {
       code: 'ΕΞ.1.3', description: 'Κατασκευή πισίνας', unit: 'm²',
-      quantity: geometry.poolArea, unitPrice: rate,
-      total: parseFloat((geometry.poolArea * rate).toFixed(2)),
+      quantity: geometry.poolArea, unitPrice,
+      total: parseFloat((geometry.poolArea * unitPrice).toFixed(2)),
       medskoCode: 'ΕΞ.1.3',
       calculationNote: `Εμβαδόν πισίνας = ${geometry.poolArea}m²`,
       confidence: 'calculated',
