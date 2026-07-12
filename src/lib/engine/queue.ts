@@ -3,14 +3,9 @@
 // Prevents Vercel timeout on large file sets
 
 import { Queue, Worker, Job } from 'bullmq'
+import { getRedisConnection } from '@/lib/redis-connection'
 
-// ── Redis connection (reuse Upstash) ──────────────────────────
-const connection = {
-  host: process.env.UPSTASH_REDIS_URL?.replace('https://', '').replace('http://', '').split(':')[0] || 'localhost',
-  port: 6379,
-  password: process.env.UPSTASH_REDIS_TOKEN,
-  tls: process.env.UPSTASH_REDIS_URL?.startsWith('https') ? {} : undefined,
-}
+const connection = getRedisConnection()
 
 // ── Queue definition ──────────────────────────────────────────
 export const BOQ_QUEUE_NAME = 'boq-generation'

@@ -1,5 +1,5 @@
 // src/app/dashboard/project/[id]/page.tsx
-import { auth } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import ProjectClient from '@/components/dashboard/ProjectClient'

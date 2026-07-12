@@ -6,17 +6,27 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { NextRequest, NextResponse } from 'next/server'
 
+const isMock = process.env.MOCK_AUTH === 'true'
+
+const noopLimiter = {
+  limit: async () => ({ success: true, limit: 999, remaining: 999, reset: Date.now() + 60_000 }),
+} as unknown as Ratelimit
+
 // One Redis client, reused across requests
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_URL!,
-  token: process.env.UPSTASH_REDIS_TOKEN!,
-})
+const redis = isMock
+  ? null
+  : new Redis({
+      url: process.env.UPSTASH_REDIS_URL!,
+      token: process.env.UPSTASH_REDIS_TOKEN!,
+    })
 
 // Different limiters for different endpoints
-export const limiters = {
+export const limiters = isMock
+  ? { boq: noopLimiter, auth: noopLimiter, waitlist: noopLimiter, api: noopLimiter }
+  : {
   // BOQ generation — expensive, strict limit
   boq: new Ratelimit({
-    redis,
+    redis: redis!,
     limiter: Ratelimit.slidingWindow(10, '1 h'), // 10 per hour per user
     analytics: true,
     prefix: 'measur:boq',
@@ -24,21 +34,21 @@ export const limiters = {
 
   // Auth endpoints — prevent brute force
   auth: new Ratelimit({
-    redis,
+    redis: redis!,
     limiter: Ratelimit.slidingWindow(20, '15 m'),
     prefix: 'measur:auth',
   }),
 
   // Waitlist — prevent spam
   waitlist: new Ratelimit({
-    redis,
+    redis: redis!,
     limiter: Ratelimit.slidingWindow(3, '1 h'),
     prefix: 'measur:waitlist',
   }),
 
   // General API
   api: new Ratelimit({
-    redis,
+    redis: redis!,
     limiter: Ratelimit.slidingWindow(100, '1 m'),
     prefix: 'measur:api',
   }),

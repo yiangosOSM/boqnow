@@ -1,7 +1,7 @@
 // src/app/api/boq/pipeline/phase-b/route.ts
 // Receives clarification answers, runs Step 5, saves final BOQ
 
-import { auth } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'

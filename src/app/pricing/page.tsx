@@ -2,7 +2,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@clerk/nextjs'
+import { useAuth } from '@/lib/use-auth'
 import { Check } from 'lucide-react'
 import { PLANS } from '@/lib/stripe'
 

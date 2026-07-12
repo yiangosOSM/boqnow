@@ -13,19 +13,19 @@ import { logger } from '@/lib/logger'
 import { BOQ_QUEUE_NAME, BOQJobData, BOQJobResult } from './queue'
 import { parseFile } from './file-parser'
 import { truncateToTokenBudget } from './cost-control'
+import { buildMockBOQ } from '@/lib/dev/mock-data'
+import { getRedisConnection } from '@/lib/redis-connection'
 import Anthropic from '@anthropic-ai/sdk'
 
-const connection = {
-  host: process.env.UPSTASH_REDIS_URL?.replace('https://', '').split(':')[0] || 'localhost',
-  port: 6379,
-  password: process.env.UPSTASH_REDIS_TOKEN,
-  tls: process.env.UPSTASH_REDIS_URL?.startsWith('https') ? {} : undefined,
-}
+const connection = getRedisConnection()
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabaseAdmin() {
+  if (process.env.MOCK_AUTH === 'true') return null
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 // ── Dead Letter Queue — failed jobs land here ─────────────────
 const DLQ_NAME = `${BOQ_QUEUE_NAME}:dlq`
@@ -39,6 +39,33 @@ const worker = new Worker<BOQJobData, BOQJobResult>(
     logger.info('BOQ job started', { jobId: job.id, projectId, fileCount: storagePaths.length })
 
     await job.updateProgress(5)
+
+    if (process.env.MOCK_AUTH === 'true') {
+      await job.updateProgress(50)
+      const boqResult = buildMockBOQ(projectName)
+      await job.updateProgress(85)
+
+      const lastVersion = await prisma.bOQVersion.findFirst({
+        where: { projectId }, orderBy: { version: 'desc' },
+      })
+      const nextVersion = (lastVersion?.version ?? 0) + 1
+
+      await prisma.$transaction([
+        prisma.bOQVersion.create({
+          data: { projectId, version: nextVersion, boqData: boqResult as any, totalAmount: boqResult.grandTotal, method: boqResult.method, confidence: boqResult.confidence },
+        }),
+        prisma.project.update({
+          where: { id: projectId },
+          data: { status: 'COMPLETE', totalAmount: boqResult.grandTotal, boqData: boqResult as any },
+        }),
+      ])
+
+      await job.updateProgress(100)
+      return { success: true, boq: boqResult }
+    }
+
+    const supabaseAdmin = getSupabaseAdmin()
+    if (!supabaseAdmin) throw new UnrecoverableError('Supabase not configured')
 
     // Build message content from storage files
     const messageContent: Anthropic.MessageParam['content'] = []
@@ -63,7 +90,7 @@ const worker = new Worker<BOQJobData, BOQJobResult>(
           messageContent.push({ type: 'image', source: { type: 'base64', media_type: ext === 'png' ? 'image/png' : 'image/jpeg', data: buffer.toString('base64') } } as any)
           filesSummary.push(`${fileName} (Image)`)
         } else {
-          const parsed = parseFile(buffer, fileName)
+          const parsed = await parseFile(buffer, fileName)
           if (parsed.text) {
             messageContent.push({ type: 'text', text: truncateToTokenBudget(parsed.text) })
             filesSummary.push(`${fileName} (${parsed.type})`)

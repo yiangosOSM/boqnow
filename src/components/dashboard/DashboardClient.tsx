@@ -1,7 +1,7 @@
 'use client'
 // src/components/dashboard/DashboardClient.tsx
 import { useState, useRef } from 'react'
-import { UserButton } from '@clerk/nextjs'
+import AuthButton from '@/components/dev/AuthButton'
 import Link from 'next/link'
 import type { BOQResult } from '@/lib/boq-generator'
 import { Upload, FileText, Download, ChevronDown, ChevronUp, Zap, Clock, CheckCircle, ExternalLink } from 'lucide-react'
@@ -15,7 +15,7 @@ interface Project {
   totalAmount: number | null
   createdAt: Date
   inputFiles: string[]
-  boqData: import('@/lib/types').BOQResult | null
+  boqData: unknown
 }
 
 interface DashboardClientProps {
@@ -100,7 +100,7 @@ export default function DashboardClient({ user, projectsThisMonth }: DashboardCl
         <span style={{ color: '#FAFAFA', fontFamily: 'Georgia, serif', fontSize: 20, letterSpacing: '-0.5px' }}>BOQNOW</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <span style={{ color: '#9A9A9A', fontSize: 13 }}>{PLAN_LABELS[plan]}</span>
-          <UserButton afterSignOutUrl="/" />
+          <AuthButton />
         </div>
       </header>
 

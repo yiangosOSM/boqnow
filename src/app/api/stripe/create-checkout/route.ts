@@ -1,5 +1,5 @@
 // src/app/api/stripe/create-checkout/route.ts
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth, currentUser } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { stripe, createOrRetrieveCustomer } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
@@ -31,10 +31,15 @@ export async function POST(req: NextRequest) {
     // Get or create Stripe customer
     const customer = await createOrRetrieveCustomer({ email, userId })
 
+    const name =
+      'fullName' in clerkUser && clerkUser.fullName
+        ? clerkUser.fullName
+        : [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || undefined
+
     // Upsert user in DB
     const dbUser = await prisma.user.upsert({
       where: { clerkId: userId },
-      create: { clerkId: userId, email, name: clerkUser.fullName || undefined },
+      create: { clerkId: userId, email, name },
       update: {},
     })
 

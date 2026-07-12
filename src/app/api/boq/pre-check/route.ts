@@ -1,6 +1,6 @@
 // src/app/api/boq/pre-check/route.ts
 // Runs BEFORE pipeline starts — warns user upfront about file quality
-import { auth } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { preUploadCheck, ALLOWED_EXTENSIONS } from '@/lib/engine/file-parser'
 

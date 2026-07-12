@@ -162,8 +162,9 @@ export async function getLivePriceMap(
     // Group by materialGroup
     const grouped: Record<string, typeof personalItems> = {}
     for (const item of personalItems) {
-      if (!grouped[item.materialGroup]) grouped[item.materialGroup] = []
-      grouped[item.materialGroup].push(item)
+      const group = item.materialGroup ?? 'unknown'
+      if (!grouped[group]) grouped[group] = []
+      grouped[group].push(item)
     }
 
     // Override shared price with personal weighted avg (personal prices take priority)
@@ -246,7 +247,9 @@ export async function recomputeAllPriceReferences(region: string = 'cyprus'): Pr
   })
 
   await Promise.all(
-    groups.map(g => recomputePriceReference(g.materialGroup, region))
+    groups
+      .filter((g): g is { materialGroup: string } => g.materialGroup != null)
+      .map(g => recomputePriceReference(g.materialGroup, region))
   )
 }
 

@@ -1,7 +1,8 @@
 // src/app/api/export/excel/route.ts
-import { auth } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import type { BOQResult } from '@/lib/types'
 import * as XLSX from 'xlsx'
 
 export async function POST(req: NextRequest) {
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Project not found' }, { status: 404 })
   }
 
-  const boq = project.boqData as import('@/lib/types').BOQResult
+  const boq = project.boqData as unknown as BOQResult
   const wb = XLSX.utils.book_new()
 
   // ── Sheet 1: Summary ──────────────────────────────────────────

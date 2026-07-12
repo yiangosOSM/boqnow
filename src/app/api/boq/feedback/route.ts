@@ -1,5 +1,5 @@
 // src/app/api/boq/feedback/route.ts
-import { auth } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 

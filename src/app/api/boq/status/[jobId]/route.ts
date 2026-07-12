@@ -1,9 +1,10 @@
 // src/app/api/boq/status/[jobId]/route.ts
 // Client polls this endpoint to get async BOQ job status
 
-import { auth } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import type { BOQResult } from '@/lib/types'
 
 export async function GET(
   req: NextRequest,
@@ -26,7 +27,7 @@ export async function GET(
   return NextResponse.json({
     projectId: project.id,
     status: project.status,    // 'processing' | 'complete' | 'error'
-    boq: project.status === 'COMPLETE' ? project.boqData as import('@/lib/types').BOQResult : null,
+    boq: project.status === 'COMPLETE' ? (project.boqData as unknown as BOQResult) : null,
     totalAmount: project.totalAmount,
     projectName: project.name,
   })

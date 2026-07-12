@@ -2,7 +2,7 @@
 // Runs Steps 1-4: classification → extraction → review → questions
 // Returns questions for user to answer before final BOQ
 
-import { auth } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'

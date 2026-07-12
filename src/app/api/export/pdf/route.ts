@@ -1,7 +1,7 @@
 // src/app/api/export/pdf/route.ts
 // Generates real PDF using Puppeteer + @sparticuz/chromium (Vercel compatible)
 
-import { auth } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 

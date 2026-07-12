@@ -1,5 +1,5 @@
 // src/app/api/convert/dwg/route.ts
-import { auth } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { limiters, getIdentifier, applyRateLimit } from '@/lib/rate-limit'

@@ -1,6 +1,6 @@
 // src/app/api/admin/quotes/route.ts
 // Admin-only: upload + list historical quotes
-import { auth } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
